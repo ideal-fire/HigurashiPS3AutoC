@@ -1,0 +1,1 @@
+gcc src/main.c -lcurl -o bin/Linux/a
