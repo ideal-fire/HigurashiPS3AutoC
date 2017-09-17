@@ -1,1 +1,1 @@
-gcc src/main.c -Llib -llua -lcurldll -o bin/a.exe
+gcc src/main.c -Llib -lcurldll -o bin/Windows/a.exe
