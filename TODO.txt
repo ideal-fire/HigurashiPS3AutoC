@@ -1,12 +1,14 @@
 TODO:
+- Move extracted files
+- Check for half-installed patches
 - Auto game path detection
 - Clean code
-- Zip extraction, somehow
 
 Done:
 - Make build file for Linux
 - Load URLs from file
-- Load URLs from the Windows installer batch file.
+	- Load URLs from the Windows installer batch file.
+- Zip extraction using 7zip on Windows and p7zip otherwise.
 
 Bonus:
 - Make build file for mac??

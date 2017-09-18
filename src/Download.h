@@ -57,11 +57,16 @@
 				*_toStoreSize = chunkToDownloadTo.size;
 			}
 		}
+		int progress_callback(void *clientp,curl_off_t dltotal,curl_off_t dlnow,curl_off_t ultotal,curl_off_t ulnow){
+			printf("%ld/%ld\r",dlnow,dltotal);
+			fflush(stdout);
+			return 0;
+		}
 		void initDownload(){
 			curl_global_init(CURL_GLOBAL_ALL);
 			curl_handle = curl_easy_init();
 			//curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
-			//curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
+			curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 0L);
 			// Loads the certificate for https stuff. If the certificate file does not exist, allow insecure connections
 			if (!checkFileExist(CERTFILELOCATION)){
 				printf(CERTFILELOCATION" not found! Will allow insecure connections!");
@@ -70,6 +75,8 @@
 				curl_easy_setopt(curl_handle, CURLOPT_CAINFO, CERTFILELOCATION);
 			}
 			curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+			curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+			//curl_easy_setopt(curl_handle, CURLOPT_XFERINFOFUNCTION, progress_callback); 
 		}
 
 		void quitDownload(){

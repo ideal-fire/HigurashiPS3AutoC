@@ -1,8 +1,32 @@
-#define _GNU_SOURCE
-
 #define CERTFILELOCATION "./curl-ca-bundle.crt"
 #define GAMECHOICESLOCATION "./GameChoices.txt"
 #define INSTALLERFORMATLOCATION "./InstallerFormatString.txt"
+// Please use in format SEVENZIPLOCATION""EXTRACTZIPCOMMAND
+// x is for extract with paths -o is for output path -aoa is for overwrite without prompt
+#define EXTRACTZIPCOMMAND " x %s -o%s -aoa" 
+
+#define PLAT_UNKNOWN 0
+#define PLAT_WINDOWS 1
+#define PLAT_LINUX 2
+#if _WIN32
+	#define PLATFORM PLAT_WINDOWS
+#elif __unix__
+	#define PLATFORM PLAT_LINUX
+#else
+	#define PLATFORM PLAT_UNKNOWN
+#endif
+
+#define ISDEBUG 1
+
+#ifndef SEVENZIPLOCATION
+	#if PLATFORM == PLAT_WINDOWS
+		#define SEVENZIPLOCATION "7z.exe"
+	#elif PLATFORM == PLAT_LINUX
+		#define SEVENZIPLOCATION "./7za"
+	#else
+		#error PLATFORM constant not found. Either set it, or define SEVENZIPLOCATION
+	#endif
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,7 +181,6 @@ char* getOfficialInstallerUrl(char* _userChosenGame){
 	free(_officialUrlFormatString);
 	return _officialUrl;
 }
-
 NathanLinkedList* GetUrls(char* batchFileURL){
 	NathanLinkedList* _tempUrlList = calloc(1,sizeof(NathanLinkedList));
 	size_t sizeDownloadedBatchFile;
@@ -184,7 +207,63 @@ NathanLinkedList* GetUrls(char* batchFileURL){
 	}
 	return _tempUrlList;
 }
+// Downloads first 4 URLs of linked list
+// First one is to ./CG.zip
+// Second one is to ./Voices.zip
+// Third one is to ./CGAlt.zip
+// Fourth one is to ./Patch.zip
+void downloadListURLs(NathanLinkedList* urlList){
 
+	#if ISDEBUG == 1
+		if (checkFileExist("./CG.zip") && checkFileExist("./Voices.zip") && checkFileExist("./CGAlt.zip") && checkFileExist("./Patch.zip")){
+			printf("This is debug mode, and the zip files already exist. Would you like to redownload them? (y/n)");
+			char _userCharInput = Goodgetchar();
+			if (_userCharInput!='y'){
+				return;
+			}
+		}
+	#endif
+
+
+	char* CGURL;
+	char* VoicesURL;
+	char* CGAltURL;
+	char* PatchURL;
+
+	CGURL = malloc(strlen(getLinkedList(urlList,1)->memory)+1);
+	strcpy(CGURL,getLinkedList(urlList,1)->memory);
+	removeNewline(&CGURL);
+	VoicesURL = malloc(strlen(getLinkedList(urlList,2)->memory)+1);
+	strcpy(VoicesURL,getLinkedList(urlList,2)->memory);
+	removeNewline(&VoicesURL);
+	CGAltURL = malloc(strlen(getLinkedList(urlList,3)->memory)+1);
+	strcpy(CGAltURL,getLinkedList(urlList,3)->memory);
+	removeNewline(&CGAltURL);
+	PatchURL = malloc(strlen(getLinkedList(urlList,4)->memory)+1);
+	strcpy(PatchURL,getLinkedList(urlList,4)->memory);
+	removeNewline(&PatchURL);
+
+	printf("Downloading PS3 graphics\n%s\n",CGURL);
+	downloadToFile(CGURL,"./CG.zip");
+	printf("Downloading PS3 voices\n%s\n",VoicesURL);
+	downloadToFile(VoicesURL,"./Voices.zip");
+	printf("Downloading MangaGamer graphics\n%s\n",CGURL);
+	downloadToFile(CGAltURL,"./CGAlt.zip");
+	printf("Downloading patch\n%s\n",PatchURL);
+	downloadToFile(PatchURL,"./Patch.zip");
+
+	free(CGURL);
+	free(VoicesURL);
+	free(CGAltURL);
+	free(PatchURL);
+}
+// Easy ZIP extraction with 7ZIP or p7ZIP
+void extractZIP(char* sourceFile, char* destDirectory){
+	char* _extractionCommand = malloc(strlen(SEVENZIPLOCATION)+strlen(EXTRACTZIPCOMMAND)+1+strlen(sourceFile)+strlen(destDirectory));
+	sprintf(_extractionCommand,SEVENZIPLOCATION""EXTRACTZIPCOMMAND,sourceFile,destDirectory);
+	system(_extractionCommand);
+	free(_extractionCommand);
+}
 /*============================================================================*/
 // Returns 0 if required file is missing, 1 otherwise.
 char checkRequiredFiles(){
@@ -203,27 +282,34 @@ void init(){
 }
 /*============================================================================*/
 int main(int argc, char *argv[]){
+	// TODO - CHeck for leftover folders from previous extraction?
+		// Even though I move them if the instillation succeeds, the user could cancel halfway through
 	if (!checkRequiredFiles()){
 		return 1;
 	}
 	init();
 	char* userChosenGame = selectGame();
 	char* batchFileURL = getOfficialInstallerUrl(userChosenGame);
-	printf("You chose %s\n",userChosenGame);
-	printf("official url is %s\n",batchFileURL);
 	printf("Downloading script...\n");
-	
-	NathanLinkedList* myList = GetUrls(batchFileURL);
-	
+	NathanLinkedList* urlList = GetUrls(batchFileURL);
 	free(batchFileURL);
 	free(userChosenGame);
-	
-	printf("Found urls:\n");
-
-	int i;
-	for (i=0;i<getLinkedListLength(myList);i++){
-		printf("(%d) %s\n",(i+1),getLinkedList(myList,i+1)->memory);
+	// Make sure we got exactly 4 URLs
+	if (getLinkedListLength(urlList)!=4){
+		printf("Incorrect number of URLs found. %d URLs were found, when exactly 4 were expected.\nURLs found:\n",getLinkedListLength(urlList));
+		int i;
+		for (i=0;i<getLinkedListLength(urlList);i++){
+			printf("(%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
+		}
+		return 1;
 	}
+	downloadListURLs(urlList);
+	freeLinkedList(urlList);
+
+	extractZIP("./CG.zip","./ExtractedCG");
+	extractZIP("./Voices.zip","./ExtractedVoices");
+	extractZIP("./CGAlt.zip","./ExtractedCGAlt");
+	extractZIP("./Patch.zip","./ExtractedPatch");
 
 	quitApplication();
 	return 0;
