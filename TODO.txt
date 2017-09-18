@@ -1,12 +1,12 @@
 TODO:
-- Load URLs from file
 - Auto game path detection
 - Clean code
 - Zip extraction, somehow
 
 Done:
 - Make build file for Linux
+- Load URLs from file
+- Load URLs from the Windows installer batch file.
 
 Bonus:
-- Load URLs from the Windows installer batch file.
 - Make build file for mac??

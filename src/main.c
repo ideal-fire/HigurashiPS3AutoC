@@ -101,7 +101,6 @@ char Goodgetchar(){
 	fflush(stdin);
 	return _userCharInput;
 }
-
 // Returns malloc'd string of the game name chosen.
 // Loads file from GAMECHOICESLOCATION
 char* selectGame(){
@@ -139,22 +138,6 @@ char* selectGame(){
 	free(lastReadLine);
 	return _userChosenGameString;
 }
-/*============================================================================*/
-// Returns 0 if required file is missing, 1 otherwise.
-char checkRequiredFiles(){
-	if (checkFileExist(GAMECHOICESLOCATION)==0){
-		printf(GAMECHOICESLOCATION" is missing! Please redownload.");
-		return 0;
-	}
-	if (checkFileExist(INSTALLERFORMATLOCATION)==0){
-		printf(INSTALLERFORMATLOCATION" is missing! Please redownload.");
-		return 0;
-	}
-	return 1;
-}
-void init(){
-	initDownload();
-}
 // Uses format string from INSTALLERFORMATLOCATION
 // Returns malloc'd complete url
 char* getOfficialInstallerUrl(char* _userChosenGame){
@@ -174,6 +157,51 @@ char* getOfficialInstallerUrl(char* _userChosenGame){
 	free(_officialUrlFormatString);
 	return _officialUrl;
 }
+
+NathanLinkedList* GetUrls(char* batchFileURL){
+	NathanLinkedList* _tempUrlList = calloc(1,sizeof(NathanLinkedList));
+	size_t sizeDownloadedBatchFile;
+	char* downloadedBatchFile;
+	downloadWebpageData(batchFileURL,&downloadedBatchFile,&sizeDownloadedBatchFile);
+	char str[] ="- This, a sample string.";
+	char* lastFoundLine;
+	lastFoundLine = strtok (downloadedBatchFile,"\n");
+	while (lastFoundLine != NULL){
+		char* _urlSearchResult = strstr(lastFoundLine,"http");
+		if (_urlSearchResult!=NULL){
+			int i;
+			for (i=0;i<strlen(_urlSearchResult);i++){
+				if (_urlSearchResult[i]==' '){
+					break;
+				}
+			}
+			NathanLinkedList* _tempAddList = addToLinkedList(_tempUrlList);
+			_tempAddList->memory = malloc(i+1);
+			strncpy(_tempAddList->memory,_urlSearchResult,i);
+			(_tempAddList->memory)[i]='\0';
+		}
+		lastFoundLine = strtok (NULL, "\n");
+	}
+	return _tempUrlList;
+}
+
+/*============================================================================*/
+// Returns 0 if required file is missing, 1 otherwise.
+char checkRequiredFiles(){
+	if (checkFileExist(GAMECHOICESLOCATION)==0){
+		printf(GAMECHOICESLOCATION" is missing! Please redownload.");
+		return 0;
+	}
+	if (checkFileExist(INSTALLERFORMATLOCATION)==0){
+		printf(INSTALLERFORMATLOCATION" is missing! Please redownload.");
+		return 0;
+	}
+	return 1;
+}
+void init(){
+	initDownload();
+}
+/*============================================================================*/
 int main(int argc, char *argv[]){
 	if (!checkRequiredFiles()){
 		return 1;
@@ -183,10 +211,20 @@ int main(int argc, char *argv[]){
 	char* batchFileURL = getOfficialInstallerUrl(userChosenGame);
 	printf("You chose %s\n",userChosenGame);
 	printf("official url is %s\n",batchFileURL);
+	printf("Downloading script...\n");
 	
+	NathanLinkedList* myList = GetUrls(batchFileURL);
+	
+	free(batchFileURL);
 	free(userChosenGame);
-	//downloadToFile("http://example.com","./google2.html");
-	//downloadWebpageData(&noobStruct,"https://www.google.com");
+	
+	printf("Found urls:\n");
+
+	int i;
+	for (i=0;i<getLinkedListLength(myList);i++){
+		printf("(%d) %s\n",(i+1),getLinkedList(myList,i+1)->memory);
+	}
+
 	quitApplication();
 	return 0;
 }
