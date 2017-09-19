@@ -275,6 +275,10 @@ char checkRequiredFiles(){
 		printf(INSTALLERFORMATLOCATION" is missing! Please redownload.");
 		return 0;
 	}
+	if (checkFileExist(SEVENZIPLOCATION)==0){
+		printf(SEVENZIPLOCATION" is missing! Please redownload.");
+		return 0;
+	}
 	return 1;
 }
 void init(){
