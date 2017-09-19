@@ -14,4 +14,6 @@ mkdir bin/Linux
 ```
 Find compiled program at
 HigurashiPS3AutoC/bin/Linux/a
+
+
 Look in the RequiredFiles folder for files you need beside the exe.
