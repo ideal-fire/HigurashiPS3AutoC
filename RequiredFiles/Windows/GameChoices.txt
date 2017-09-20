@@ -3,3 +3,9 @@ watanagashi
 tatarigoroshi
 himatsubushi
 meakashi
+---
+Higurashi When They Cry/HigurashiEp01_Data
+Higurashi 02 - Watanagashi/HigurashiEp02_Data
+Higurashi 03 - Tatarigoroshi/HigurashiEp03_Data
+Higurashi 04 - Himatsubushi/HigurashiEp04_Data
+Higurashi 05 - Meakashi/HigurashiEp05_Data

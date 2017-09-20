@@ -3,7 +3,13 @@
 #define INSTALLERFORMATLOCATION "./InstallerFormatString.txt"
 // Please use in format SEVENZIPLOCATION""EXTRACTZIPCOMMAND
 // x is for extract with paths -o is for output path -aoa is for overwrite without prompt
-#define EXTRACTZIPCOMMAND " x %s -o%s -aoa" 
+#define EXTRACTZIPCOMMAND " x \"%s\" -o\"%s\" -aoa" 
+
+#define DOWNLOADLIST_ALL 0
+#define DOWNLOADLIST_CG 1
+#define DOWNLOADLIST_VOICES 2
+#define DOWNLOADLIST_CGALT 3
+#define DOWNLOADLIST_PATCH 4
 
 #define PLAT_UNKNOWN 0
 #define PLAT_WINDOWS 1
@@ -15,9 +21,7 @@
 #else
 	#define PLATFORM PLAT_UNKNOWN
 #endif
-
-#define ISDEBUG 1
-
+#define ISDEBUG 0
 #ifndef SEVENZIPLOCATION
 	#if PLATFORM == PLAT_WINDOWS
 		#define SEVENZIPLOCATION "7z.exe"
@@ -27,11 +31,30 @@
 		#error PLATFORM constant not found. Either set it, or define SEVENZIPLOCATION
 	#endif
 #endif
-
+#if PLATFORM == PLAT_LINUX
+	// First string is home directory, including slash
+	#define DEFAULTSTEAMDIR "%s/.steam/steam/steamapps/common/"
+	#define FOLDERDELETIONCOMMAND "rm -r \"%s\""
+	#define ALLFILEDELETECOMMAND "rm \"%s/\"*"
+	#define SLASH "/"
+#elif PLATFORM == PLAT_WINDOWS
+	// No string arguments.
+	#define DEFAULTSTEAMDIR "C:\\Program Files (x86)\\Steam\\steamapps\\common\\"
+	#define FOLDERDELETIONCOMMAND "rmdir \"%s\" /S /Q"
+	#define ALLFILEDELETECOMMAND "del \"%s\\*\" /S /Q > nul"
+	#define SLASH "\\"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <dirent.h>
+#include <errno.h>
+#include <ctype.h>
+#if PLATFORM == PLAT_LINUX
+	#include <sys/types.h>
+	#include <pwd.h>
+#endif
 // main.h
 	signed char checkFileExist(const char* location);
 	typedef struct NathanLinkedList_t{
@@ -40,13 +63,92 @@
 	}NathanLinkedList;
 // My headers
 #include "Download.h"
-
 // =====================================================
-char* urlGraphicsPatch;
-char* urlVoicesPatch;
-char* urlMangaGamerGraphics;
-char* urlScriptPatch;
 // =====================================================
+#if PLATFORM == PLAT_WINDOWS
+	// getline replacement for Windows
+	size_t getline(char **lineptr, size_t *n, FILE *stream) {
+		/* This code (applies to this method only) is public domain -- Will Hartung 4/9/09 */
+		char *bufptr = NULL;
+		char *p = bufptr;
+		size_t size;
+		int c;
+	
+		if (lineptr == NULL) {
+			return -1;
+		}
+		if (stream == NULL) {
+			return -1;
+		}
+		if (n == NULL) {
+			return -1;
+		}
+		bufptr = *lineptr;
+		size = *n;
+	
+		c = fgetc(stream);
+		if (c == EOF) {
+			return -1;
+		}
+		if (bufptr == NULL) {
+			bufptr = malloc(128);
+			if (bufptr == NULL) {
+				return -1;
+			}
+			size = 128;
+		}
+		p = bufptr;
+		while(c != EOF) {
+			if ((p - bufptr) > (size - 1)) {
+				size = size + 128;
+				bufptr = realloc(bufptr, size);
+				if (bufptr == NULL) {
+					return -1;
+				}
+			}
+			*p++ = c;
+			if (c == '\n') {
+				break;
+			}
+			c = fgetc(stream);
+		}
+	
+		*p++ = '\0';
+		*lineptr = bufptr;
+		*n = size;
+	
+		return p - bufptr - 1;
+	}
+#endif
+#if PLATFORM == PLAT_LINUX
+	char* getHomeDirectory(){
+		struct passwd *pw = getpwuid(getuid());
+		if (strlen(pw->pw_dir)==0){
+			return NULL;
+		}
+		char* _toReturnString = malloc(strlen(pw->pw_dir));
+		strcpy(_toReturnString,pw->pw_dir);
+		return _toReturnString;
+	}
+	void itoa(int _num, char* _buffer, int _uselessBase){
+		sprintf(_buffer, "%d", _num);
+	}
+#endif
+void DeleteFolder(char* folderPath){
+	perror("This function should never be used. Deleting CompiledUpdateScripts folder breaks the game.");
+	return;
+	char* _deletionCommand = malloc(strlen(FOLDERDELETIONCOMMAND)+strlen(folderPath)+1);
+	sprintf(_deletionCommand,FOLDERDELETIONCOMMAND,folderPath);
+	system(_deletionCommand);
+	free(_deletionCommand);
+}
+// Folder should not end with slash
+void DeleteAllInFolder(char* folderPath){
+	char* _deletionCommand = malloc(strlen(ALLFILEDELETECOMMAND)+strlen(folderPath)+1);
+	sprintf(_deletionCommand,ALLFILEDELETECOMMAND,folderPath);
+	system(_deletionCommand);
+	free(_deletionCommand);
+}
 signed char checkFileExist(const char* location){
 	if( access( location, F_OK ) != -1 ) {
 		return 1;
@@ -116,51 +218,40 @@ void freeLinkedList(NathanLinkedList* _startingList){
 		_currentListToFree = _nextListToFree;
 	}
 }
-// Like getchar, but doesn't keep the buffer after.
+// Like getchar, but uses getline and returns the first char the user enters
 char Goodgetchar(){
-	char _userCharInput;
-	do{
-		_userCharInput = getchar();
-	}while(_userCharInput=='\n' || _userCharInput==EOF);
-	fflush(stdin);
-	return _userCharInput;
+	char* userDataFolderPathInput=NULL;
+	size_t userDataFolderPathInputBufferSize;
+	getline(&userDataFolderPathInput,&userDataFolderPathInputBufferSize,stdin);
+	char _cachedChar = userDataFolderPathInput[strlen(userDataFolderPathInput)-2]; // Subtract two as there is null char
+	free(userDataFolderPathInput);
+	return _cachedChar;
+}
+void printDivider(){
+	printf("============\n");
 }
 // Returns malloc'd string of the game name chosen.
 // Loads file from GAMECHOICESLOCATION
-char* selectGame(){
-	NathanLinkedList* _tempGamenameList = calloc(1,sizeof(NathanLinkedList));
-
-	char* lastReadLine = malloc(256);
-	FILE* fp = fopen(GAMECHOICESLOCATION, "r");
-	while (fgets(lastReadLine, 256, fp)) {
-		removeNewline(&lastReadLine);
-		NathanLinkedList* _tempAddList = addToLinkedList(_tempGamenameList);
-		_tempAddList->memory = malloc(strlen(lastReadLine)+1);
-		strcpy(_tempAddList->memory,lastReadLine);
-	}
-	fclose(fp);
-	
+char selectGame(NathanLinkedList* _tempGamenameList){
 	char _userChosenGame;
-	printf("\n==========");
 	do{
-		printf("\nPlease enter the number for the game you want to patch.\n==========\n");
+		printDivider();
+		printf("\nPlease enter the number for the game you want to patch.\n");
+		printDivider();
 		int i;
 		for (i=0;i<getLinkedListLength(_tempGamenameList);i++){
-			printf("(%d) %s\n",(i+1),getLinkedList(_tempGamenameList,i+1)->memory);
+			printf("%d) %s\n",(i+1),getLinkedList(_tempGamenameList,i+1)->memory);
 		}
 		_userChosenGame = Goodgetchar();
 		if (_userChosenGame>=58 || _userChosenGame<=48 || _userChosenGame-48>getLinkedListLength(_tempGamenameList)){
-			printf("==========\n(Previous input invalid. Enter a number 1 through %d)",getLinkedListLength(_tempGamenameList));
+			printDivider();
+			printf("(Previous input invalid. Enter a number 1 through %d)",getLinkedListLength(_tempGamenameList));
 			_userChosenGame=0;
 		}else{
 			_userChosenGame-=48;
 		}
 	}while(_userChosenGame==0);
-	char* _userChosenGameString = malloc(strlen(getLinkedList(_tempGamenameList,_userChosenGame)->memory)+1);
-	strcpy(_userChosenGameString,getLinkedList(_tempGamenameList,_userChosenGame)->memory);
-	freeLinkedList(_tempGamenameList);
-	free(lastReadLine);
-	return _userChosenGameString;
+	return _userChosenGame;
 }
 // Uses format string from INSTALLERFORMATLOCATION
 // Returns malloc'd complete url
@@ -202,60 +293,11 @@ NathanLinkedList* GetUrls(char* batchFileURL){
 			_tempAddList->memory = malloc(i+1);
 			strncpy(_tempAddList->memory,_urlSearchResult,i);
 			(_tempAddList->memory)[i]='\0';
+			removeNewline(&(_tempAddList->memory));
 		}
 		lastFoundLine = strtok (NULL, "\n");
 	}
 	return _tempUrlList;
-}
-// Downloads first 4 URLs of linked list
-// First one is to ./CG.zip
-// Second one is to ./Voices.zip
-// Third one is to ./CGAlt.zip
-// Fourth one is to ./Patch.zip
-void downloadListURLs(NathanLinkedList* urlList){
-
-	#if ISDEBUG == 1
-		if (checkFileExist("./CG.zip") && checkFileExist("./Voices.zip") && checkFileExist("./CGAlt.zip") && checkFileExist("./Patch.zip")){
-			printf("This is debug mode, and the zip files already exist. Would you like to redownload them? (y/n)");
-			char _userCharInput = Goodgetchar();
-			if (_userCharInput!='y'){
-				return;
-			}
-		}
-	#endif
-
-
-	char* CGURL;
-	char* VoicesURL;
-	char* CGAltURL;
-	char* PatchURL;
-
-	CGURL = malloc(strlen(getLinkedList(urlList,1)->memory)+1);
-	strcpy(CGURL,getLinkedList(urlList,1)->memory);
-	removeNewline(&CGURL);
-	VoicesURL = malloc(strlen(getLinkedList(urlList,2)->memory)+1);
-	strcpy(VoicesURL,getLinkedList(urlList,2)->memory);
-	removeNewline(&VoicesURL);
-	CGAltURL = malloc(strlen(getLinkedList(urlList,3)->memory)+1);
-	strcpy(CGAltURL,getLinkedList(urlList,3)->memory);
-	removeNewline(&CGAltURL);
-	PatchURL = malloc(strlen(getLinkedList(urlList,4)->memory)+1);
-	strcpy(PatchURL,getLinkedList(urlList,4)->memory);
-	removeNewline(&PatchURL);
-
-	printf("Downloading PS3 graphics\n%s\n",CGURL);
-	downloadToFile(CGURL,"./CG.zip");
-	printf("Downloading PS3 voices\n%s\n",VoicesURL);
-	downloadToFile(VoicesURL,"./Voices.zip");
-	printf("Downloading MangaGamer graphics\n%s\n",CGURL);
-	downloadToFile(CGAltURL,"./CGAlt.zip");
-	printf("Downloading patch\n%s\n",PatchURL);
-	downloadToFile(PatchURL,"./Patch.zip");
-
-	free(CGURL);
-	free(VoicesURL);
-	free(CGAltURL);
-	free(PatchURL);
 }
 // Easy ZIP extraction with 7ZIP or p7ZIP
 void extractZIP(char* sourceFile, char* destDirectory){
@@ -263,6 +305,52 @@ void extractZIP(char* sourceFile, char* destDirectory){
 	sprintf(_extractionCommand,SEVENZIPLOCATION""EXTRACTZIPCOMMAND,sourceFile,destDirectory);
 	system(_extractionCommand);
 	free(_extractionCommand);
+	remove(sourceFile);
+}
+char checkDirectoryExists(char* filepath){
+	DIR* dir = opendir(filepath);
+	if (dir){
+		closedir(dir);
+		return 1;
+	}else if (ENOENT == errno){
+		return 0;
+	}else{
+		printf("Could not open directory %s\nThe world is over.\n",filepath);
+		return 0;
+	}
+}
+// Assumes lists are uninitialized
+char ReadGameList(NathanLinkedList** _gameNameList, NathanLinkedList** _gameFolderList){
+	*_gameNameList = calloc(1,sizeof(NathanLinkedList));
+	*_gameFolderList = calloc(1,sizeof(NathanLinkedList));
+
+	char* lastReadLine = malloc(256);
+	FILE* fp = fopen(GAMECHOICESLOCATION, "r");
+
+	char isReadingGameFolders=0;
+
+	while (fgets(lastReadLine, 256, fp)) {
+		removeNewline(&lastReadLine);
+		if (strcmp(lastReadLine,"---")==0){
+			isReadingGameFolders=1;
+			continue;
+		}
+		NathanLinkedList* _tempAddList;
+		if (isReadingGameFolders==1){
+			_tempAddList = addToLinkedList(*_gameFolderList);
+		}else{
+			_tempAddList = addToLinkedList(*_gameNameList);
+		}
+		_tempAddList->memory = malloc(strlen(lastReadLine)+1);
+		strcpy(_tempAddList->memory,lastReadLine);
+	}
+	fclose(fp);
+	free(lastReadLine);
+	if (isReadingGameFolders==0){
+		printf("!!!!!!!!!!!!!!!!!!!!\nError, \"---\" not found.\nThis a line that seperates the game name list from the game folder list. Please add the three dashes and the game folder names.\n!!!!!!!!!!!!!!!!!!!!\n");
+		return 0;
+	}
+	return 1;
 }
 /*============================================================================*/
 // Returns 0 if required file is missing, 1 otherwise.
@@ -286,35 +374,160 @@ void init(){
 }
 /*============================================================================*/
 int main(int argc, char *argv[]){
-	// TODO - CHeck for leftover folders from previous extraction?
-		// Even though I move them if the instillation succeeds, the user could cancel halfway through
 	if (!checkRequiredFiles()){
 		return 1;
 	}
 	init();
-	char* userChosenGame = selectGame();
-	char* batchFileURL = getOfficialInstallerUrl(userChosenGame);
+	// Holds the names of the games. Ex: onikakushi
+	NathanLinkedList* gameList;
+	// Holds the names of the game's folders relative to steamapps/common/ . Ex: Higurashi 02 - Watanagashi\HigurashiEp02_Data
+	NathanLinkedList* gameFolderList;
+	if (!ReadGameList(&gameList,&gameFolderList)){
+		return 1;
+	}
+	int userChosenGame = selectGame(gameList);
+	printf("User chose %d\n",userChosenGame);
+	char* batchFileURL = getOfficialInstallerUrl(getLinkedList(gameList,userChosenGame)->memory);
 	printf("Downloading script...\n");
 	NathanLinkedList* urlList = GetUrls(batchFileURL);
-	free(batchFileURL);
-	free(userChosenGame);
 	// Make sure we got exactly 4 URLs
 	if (getLinkedListLength(urlList)!=4){
 		printf("Incorrect number of URLs found. %d URLs were found, when exactly 4 were expected.\nURLs found:\n",getLinkedListLength(urlList));
 		int i;
 		for (i=0;i<getLinkedListLength(urlList);i++){
-			printf("(%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
+			printf("%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
 		}
 		return 1;
 	}
-	downloadListURLs(urlList);
+
+	// Updater options
+	short userUpdateChoice;
+	do{
+		printDivider();
+		printf("What would you like to do?\n");
+		printf("1) Install the patch. (Do this if it's your first time.)\n");
+		printf("2) Update the PS3 graphics patch\n");
+		printf("3) Update the Voice patch\n");
+		printf("4) Update the MangaGamer graphics patch\n");
+		printf("5) Update the patch scripts (Update folder)\n");
+
+
+		userUpdateChoice = (short)Goodgetchar();
+		if (userUpdateChoice>=58 || userUpdateChoice<=48 || userUpdateChoice-48>5){
+			printDivider();
+			printf("(Previous input invalid. Enter a number 1 through %d)\n",5);
+			userUpdateChoice=-1;
+		}else{
+			userUpdateChoice-=49;
+			if (userUpdateChoice!=DOWNLOADLIST_ALL){
+				printDivider();
+				printf("Just for clarification, you have chosen to update a SINGLE COMPONENT of the entire patch.\nIf you haven't installed the entire patch to this specific game before, this will not do anything for you.\nIs this okay? (y/n)\n");
+				char _userYesOrNo = Goodgetchar();
+				if (tolower(_userYesOrNo)!='y'){
+					userUpdateChoice=-1;
+				}
+			} 
+		}
+	}while(userUpdateChoice==-1);
+
+	// Ask user for data directory
+	char* exampleFolderPath;
+	#if PLATFORM == PLAT_LINUX
+		char* userHomeDirectory = getHomeDirectory();
+		exampleFolderPath = malloc(strlen(DEFAULTSTEAMDIR)+strlen(userHomeDirectory)+strlen(getLinkedList(gameFolderList,userChosenGame)->memory)+1);
+		sprintf(exampleFolderPath,DEFAULTSTEAMDIR,userHomeDirectory);
+		strcat(exampleFolderPath,getLinkedList(gameFolderList,userChosenGame)->memory);
+		free(userHomeDirectory);
+	#elif PLATFORM == PLAT_WINDOWS
+		exampleFolderPath = malloc(strlen(DEFAULTSTEAMDIR)+strlen(getLinkedList(gameFolderList,userChosenGame)->memory)+1);
+		strcpy(exampleFolderPath,DEFAULTSTEAMDIR);
+		strcat(exampleFolderPath,getLinkedList(gameFolderList,userChosenGame)->memory);
+	#endif
+	char exampleDirectoryIsInvalid = !(checkDirectoryExists(exampleFolderPath));
+	char* userDataFolderPathInput;
+	char isSecondTimeLooped=0;
+	do{
+		if (isSecondTimeLooped==1){
+			printf("!!!!!!!!!!!!\n%s does not exist!\n!!!!!!!!!!!!\n",userDataFolderPathInput);
+			free(userDataFolderPathInput);
+		}
+		userDataFolderPathInput = NULL;
+		printDivider();
+		printf("Input the path of your Higurashi: When They Cry game's data folder.\n");
+		printf("Example:\n%s\n",exampleFolderPath);
+		if (exampleDirectoryIsInvalid==1){
+			printf("--- (Note that the example directory does not exist, so it's invalid.) ---\n");
+		}else{
+			printf("--- (Enter nothing to use the example.) ---\n");
+		}
+		printDivider();
+		size_t userDataFolderPathInputBufferSize;
+		getline(&userDataFolderPathInput,&userDataFolderPathInputBufferSize,stdin);
+		removeNewline(&userDataFolderPathInput);
+		// Trim end slash
+		if (userDataFolderPathInput[strlen(userDataFolderPathInput)-1]=='/' || userDataFolderPathInput[strlen(userDataFolderPathInput)-1]=='\\'){
+			userDataFolderPathInput[strlen(userDataFolderPathInput)-1]='\0';
+		}
+		// Copy example if use entered nothing
+		if (strlen(userDataFolderPathInput)==0){
+			free(userDataFolderPathInput);
+			userDataFolderPathInput = malloc(strlen(exampleFolderPath)+1);
+			strcpy(userDataFolderPathInput,exampleFolderPath);
+		}
+		isSecondTimeLooped=1;
+	}while(checkDirectoryExists(userDataFolderPathInput)==0);
+	free(exampleFolderPath);
+	// Make the path to the StreamingAssets folder. This is where the ZIP files are extracted to.
+	char* streamingAssetsPath=malloc(strlen(userDataFolderPathInput)+strlen("/StreamingAssets")+1);
+	strcpy(streamingAssetsPath,userDataFolderPathInput);
+	strcat(streamingAssetsPath,SLASH"StreamingAssets");
+	free(userDataFolderPathInput);
+
+
+	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_PATCH){
+		char* _tempFolderCheck=malloc(strlen(streamingAssetsPath)+strlen("/CompiledUpdateScripts")+1);
+		strcpy(_tempFolderCheck,streamingAssetsPath);
+		strcat(_tempFolderCheck,SLASH "CompiledUpdateScripts");
+		if (checkDirectoryExists(_tempFolderCheck)){
+			printf("Deleting precompiled update scripts...\n");
+			DeleteAllInFolder(_tempFolderCheck);
+		}
+		free(_tempFolderCheck);
+	}
+
+	// Actually download the files
+	if (userUpdateChoice==DOWNLOADLIST_ALL){
+		int i;
+		for (i=1;i<=4;i++){
+			printf("Downloading file %d/4...\n",i);
+			char _completedFilename[6]; // Null .zip one digit number
+			itoa(i,_completedFilename,10);
+			strcat(_completedFilename,".zip");
+			downloadToFile(getLinkedList(urlList,i)->memory,_completedFilename);
+		}
+	}else{
+		printf("Downloading file 1/1...\n");
+		char _completedFilename[6];
+		itoa(userUpdateChoice,_completedFilename,10);
+		strcat(_completedFilename,".zip");
+		downloadToFile(getLinkedList(urlList,userUpdateChoice)->memory,_completedFilename);
+	}
 	freeLinkedList(urlList);
 
-	extractZIP("./CG.zip","./ExtractedCG");
-	extractZIP("./Voices.zip","./ExtractedVoices");
-	extractZIP("./CGAlt.zip","./ExtractedCGAlt");
-	extractZIP("./Patch.zip","./ExtractedPatch");
-
+	if (userUpdateChoice==DOWNLOADLIST_ALL){
+		extractZIP("./1.zip",streamingAssetsPath);
+		extractZIP("./2.zip",streamingAssetsPath);
+		extractZIP("./3.zip",streamingAssetsPath);
+		extractZIP("./4.zip",streamingAssetsPath);
+	}else{
+		char _completedFilename[6]; // Null .zip one digit number
+		itoa(userUpdateChoice,_completedFilename,10);
+		strcat(_completedFilename,".zip");
+		extractZIP(_completedFilename,streamingAssetsPath);
+	}	
+	printDivider();
+	printf("Done.\nI have no idea if it worked.\n");
+	printDivider();
 	quitApplication();
 	return 0;
 }

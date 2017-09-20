@@ -1,14 +1,16 @@
 TODO:
-- Move extracted files
-- Check for half-installed patches
-- Auto game path detection
-- Clean code
+- Copy the features of the Meakashi updater
+	- This is a simple menu that lets you choose which part of the game patch to update.
+	- (Refactor code to make it so I just supply a url to a function and it extracts the stuff to the StreamingAssets folder? I would do 4 of this function call for the complete instillation)
 
 Done:
 - Make build file for Linux
 - Load URLs from file
 	- Load URLs from the Windows installer batch file.
 - Zip extraction using 7zip on Windows and p7zip otherwise.
+- Move extracted files
+- Auto game path detection
+	- This will include home path detection for Linux
 
 Bonus:
 - Make build file for mac??
