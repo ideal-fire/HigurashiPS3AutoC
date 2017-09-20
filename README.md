@@ -1,7 +1,5 @@
 Automated installer for 07th Mod's PS3 Voices and Graphics patch for Higurashi: When They Cry remake. Programmed with C, works on Linux.
 
-Not yet complete.
-
 Compiling
 ---
 Requires libcurl.
