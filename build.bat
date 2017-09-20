@@ -1,1 +1,1 @@
-gcc src/main.c -Llib -lcurldll -o bin/Windows/a.exe icon.res
+gcc src/main.c -Llib -lcurldll -o bin/Windows/HigurashiPS3AutoC.exe icon.res

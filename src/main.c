@@ -1,3 +1,6 @@
+#define VERSION 1
+#define ISDEBUG 0
+
 #define CERTFILELOCATION "./curl-ca-bundle.crt"
 #define GAMECHOICESLOCATION "./GameChoices.txt"
 #define INSTALLERFORMATLOCATION "./InstallerFormatString.txt"
@@ -21,7 +24,6 @@
 #else
 	#define PLATFORM PLAT_UNKNOWN
 #endif
-#define ISDEBUG 0
 #ifndef SEVENZIPLOCATION
 	#if PLATFORM == PLAT_WINDOWS
 		#define SEVENZIPLOCATION "7z.exe"
@@ -236,7 +238,7 @@ char selectGame(NathanLinkedList* _tempGamenameList){
 	char _userChosenGame;
 	do{
 		printDivider();
-		printf("\nPlease enter the number for the game you want to patch.\n");
+		printf("Please enter the number for the game you want to patch.\n");
 		printDivider();
 		int i;
 		for (i=0;i<getLinkedListLength(_tempGamenameList);i++){
@@ -376,6 +378,7 @@ void init(){
 }
 /*============================================================================*/
 int main(int argc, char *argv[]){
+	printf("========================\nHigurashi: When They Cry PS3 Voices & Graphics auto installer\nv%d\n",VERSION);
 	if (!checkRequiredFiles()){
 		return 1;
 	}

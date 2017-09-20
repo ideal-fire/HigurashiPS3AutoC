@@ -2,7 +2,7 @@
 cd bin
 cd Windows
 @echo on
-a
+HigurashiPS3AutoC
 @echo off
 cd ..
 cd ..
