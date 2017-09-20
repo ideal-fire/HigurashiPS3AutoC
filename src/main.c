@@ -305,7 +305,9 @@ void extractZIP(char* sourceFile, char* destDirectory){
 	sprintf(_extractionCommand,SEVENZIPLOCATION""EXTRACTZIPCOMMAND,sourceFile,destDirectory);
 	system(_extractionCommand);
 	free(_extractionCommand);
-	remove(sourceFile);
+	if (remove(sourceFile)!=0){
+		printf("Failed to delete %s\n",sourceFile);
+	}
 }
 char checkDirectoryExists(char* filepath){
 	DIR* dir = opendir(filepath);

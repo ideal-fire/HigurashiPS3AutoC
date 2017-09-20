@@ -8,7 +8,7 @@ License for use and distribution
 Licenses for files are:
 
   1) 7z.dll: GNU LGPL + unRAR restriction
-  2) 7z.exe:  GNU LGPL
+  2) 7z.exe, 7za:  GNU LGPL
 
 The GNU LGPL + unRAR restriction means that you must follow both 
 GNU LGPL rules and unRAR restriction rules.
