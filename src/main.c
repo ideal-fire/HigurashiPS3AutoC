@@ -4,6 +4,8 @@
 #define CERTFILELOCATION "./curl-ca-bundle.crt"
 #define GAMECHOICESLOCATION "./GameChoices.txt"
 #define INSTALLERFORMATLOCATION "./InstallerFormatString.txt"
+
+#define INSTALLEFRORMATLOCATIONVITA "./InstallerFormatStringVita.txt"
 // Please use in format SEVENZIPLOCATION""EXTRACTZIPCOMMAND
 // x is for extract with paths -o is for output path -aoa is for overwrite without prompt
 #define EXTRACTZIPCOMMAND " x \"%s\" -o\"%s\" -aoa" 
@@ -13,6 +15,7 @@
 #define DOWNLOADLIST_VOICES 2
 #define DOWNLOADLIST_CGALT 3
 #define DOWNLOADLIST_PATCH 4
+#define DOWNLOADLIST_HIGURASHIVITA 5
 
 #define PLAT_UNKNOWN 0
 #define PLAT_WINDOWS 1
@@ -204,12 +207,12 @@ char selectGame(NathanLinkedList* _tempGamenameList){
 	}while(_userChosenGame==0);
 	return _userChosenGame;
 }
-// Uses format string from INSTALLERFORMATLOCATION
+// Uses format string from _passedFormat
 // Returns malloc'd complete url
-char* getOfficialInstallerUrl(char* _userChosenGame){
+char* getOfficialInstallerUrl(char* _userChosenGame, char* _passedFormat){
 	// Read the format string
 	char* lastReadLine = malloc(256);
-	FILE* fp = fopen(INSTALLERFORMATLOCATION, "r");
+	FILE* fp = fopen(_passedFormat, "r");
 	fgets(lastReadLine, 256, fp);
 	fclose(fp);
 	removeNewline(&lastReadLine);
@@ -339,20 +342,9 @@ int main(int argc, char *argv[]){
 	if (!ReadGameList(&gameList,&gameFolderList)){
 		return 1;
 	}
+
 	int userChosenGame = selectGame(gameList);
 	printf("User chose %d\n",userChosenGame);
-	char* batchFileURL = getOfficialInstallerUrl(getLinkedList(gameList,userChosenGame)->memory);
-	printf("Downloading script...\n");
-	NathanLinkedList* urlList = GetUrls(batchFileURL);
-	// Make sure we got exactly 4 URLs
-	if (getLinkedListLength(urlList)!=4){
-		printf("Incorrect number of URLs found. %d URLs were found, when exactly 4 were expected.\nURLs found:\n",getLinkedListLength(urlList));
-		int i;
-		for (i=0;i<getLinkedListLength(urlList);i++){
-			printf("%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
-		}
-		return 1;
-	}
 
 	// Updater options
 	short userUpdateChoice;
@@ -364,16 +356,16 @@ int main(int argc, char *argv[]){
 		printf("3) Update the Voice patch\n");
 		printf("4) Update the MangaGamer graphics patch\n");
 		printf("5) Update the patch scripts (Update folder)\n");
-
+		printf("6) Install the older Higurashi-Vita compatible version.\n");
 
 		userUpdateChoice = (short)Goodgetchar();
-		if (userUpdateChoice>=58 || userUpdateChoice<=48 || userUpdateChoice-48>5){
+		if (userUpdateChoice>=58 || userUpdateChoice<=48 || userUpdateChoice-48>6){
 			printDivider();
 			printf("(Previous input invalid. Enter a number 1 through %d)\n",5);
 			userUpdateChoice=-1;
 		}else{
 			userUpdateChoice-=49;
-			if (userUpdateChoice!=DOWNLOADLIST_ALL){
+			if (userUpdateChoice!=DOWNLOADLIST_ALL && userUpdateChoice!=DOWNLOADLIST_HIGURASHIVITA){
 				printDivider();
 				printf("Just for clarification, you have chosen to update a SINGLE COMPONENT of the entire patch.\nIf you haven't installed the entire patch to this specific game before, this will not do anything for you.\nIs this okay? (y/n)\n");
 				char _userYesOrNo = Goodgetchar();
@@ -383,6 +375,25 @@ int main(int argc, char *argv[]){
 			} 
 		}
 	}while(userUpdateChoice==-1);
+
+	
+	char* batchFileURL;
+	if (userUpdateChoice==DOWNLOADLIST_HIGURASHIVITA){
+		batchFileURL = getOfficialInstallerUrl(getLinkedList(gameList,userChosenGame)->memory,INSTALLEFRORMATLOCATIONVITA);
+	}else{
+		batchFileURL = getOfficialInstallerUrl(getLinkedList(gameList,userChosenGame)->memory,INSTALLERFORMATLOCATION);
+	}
+	printf("Downloading script...\n");
+	NathanLinkedList* urlList = GetUrls(batchFileURL);
+	// Make sure we got exactly 4 URLs
+	if (getLinkedListLength(urlList)!=4){
+		printf("Incorrect number of URLs found. %d URLs were found, when exactly 4 were expected.\nURLs found:\n",getLinkedListLength(urlList));
+		int i;
+		for (i=0;i<getLinkedListLength(urlList);i++){
+			printf("%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
+		}
+		return 1;
+	}
 
 	// Ask user for data directory
 	char* exampleFolderPath;
@@ -437,7 +448,6 @@ int main(int argc, char *argv[]){
 	strcat(streamingAssetsPath,SLASH"StreamingAssets");
 	free(userDataFolderPathInput);
 
-
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_PATCH){
 		char* _tempFolderCheck=malloc(strlen(streamingAssetsPath)+strlen("/CompiledUpdateScripts")+1);
 		strcpy(_tempFolderCheck,streamingAssetsPath);
@@ -450,7 +460,7 @@ int main(int argc, char *argv[]){
 	}
 
 	// Actually download the files
-	if (userUpdateChoice==DOWNLOADLIST_ALL){
+	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice == DOWNLOADLIST_HIGURASHIVITA){
 		int i;
 		for (i=1;i<=4;i++){
 			printf("Downloading file %d/4...\n",i);
@@ -468,7 +478,7 @@ int main(int argc, char *argv[]){
 	}
 	freeLinkedList(urlList);
 
-	if (userUpdateChoice==DOWNLOADLIST_ALL){
+	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_HIGURASHIVITA){
 		extractZIP("./1.zip",streamingAssetsPath);
 		extractZIP("./2.zip",streamingAssetsPath);
 		extractZIP("./3.zip",streamingAssetsPath);
