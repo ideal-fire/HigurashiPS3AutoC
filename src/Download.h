@@ -51,6 +51,7 @@
 			res = curl_easy_perform(curl_handle);
 			if(res != CURLE_OK) {
 				printf("Failed, the world is over.\n");
+				printf("%d\n",res);
 			}
 			*_toStoreWebpageData = chunkToDownloadTo.memory;
 			if (_toStoreSize!=NULL){

@@ -1,3 +1,4 @@
+
 #define VERSION 1
 #define ISDEBUG 0
 
@@ -199,7 +200,7 @@ char selectGame(NathanLinkedList* _tempGamenameList){
 		_userChosenGame = Goodgetchar();
 		if (_userChosenGame>=58 || _userChosenGame<=48 || _userChosenGame-48>getLinkedListLength(_tempGamenameList)){
 			printDivider();
-			printf("(Previous input invalid. Enter a number 1 through %d)",getLinkedListLength(_tempGamenameList));
+			printf("(Previous input invalid. Enter a number 1 through %d)\n",getLinkedListLength(_tempGamenameList));
 			_userChosenGame=0;
 		}else{
 			_userChosenGame-=48;
@@ -227,6 +228,7 @@ char* getOfficialInstallerUrl(char* _userChosenGame, char* _passedFormat){
 	return _officialUrl;
 }
 NathanLinkedList* GetUrls(char* batchFileURL){
+	printf("%s\n",batchFileURL);
 	NathanLinkedList* _tempUrlList = calloc(1,sizeof(NathanLinkedList));
 	size_t sizeDownloadedBatchFile;
 	char* downloadedBatchFile;
@@ -334,6 +336,8 @@ int main(int argc, char *argv[]){
 	if (!checkRequiredFiles()){
 		return 1;
 	}
+	// This changes if they choose to install the PS Vita version of the patch
+	char _totalFilesToDownload=5;
 	init();
 	// Holds the names of the games. Ex: onikakushi
 	NathanLinkedList* gameList;
@@ -342,7 +346,6 @@ int main(int argc, char *argv[]){
 	if (!ReadGameList(&gameList,&gameFolderList)){
 		return 1;
 	}
-
 	int userChosenGame = selectGame(gameList);
 	printf("User chose %d\n",userChosenGame);
 
@@ -355,7 +358,7 @@ int main(int argc, char *argv[]){
 		printf("2) Update the PS3 graphics patch\n");
 		printf("3) Update the Voice patch\n");
 		printf("4) Update the MangaGamer graphics patch\n");
-		printf("5) Update the patch scripts (Update folder)\n");
+		printf("5) Update the patch scripts and dll\n");
 		printf("6) Install the older Higurashi-Vita compatible version.\n");
 
 		userUpdateChoice = (short)Goodgetchar();
@@ -376,6 +379,9 @@ int main(int argc, char *argv[]){
 		}
 	}while(userUpdateChoice==-1);
 
+	if (userUpdateChoice==DOWNLOADLIST_HIGURASHIVITA){
+		_totalFilesToDownload=4;
+	}
 	
 	char* batchFileURL;
 	if (userUpdateChoice==DOWNLOADLIST_HIGURASHIVITA){
@@ -385,9 +391,9 @@ int main(int argc, char *argv[]){
 	}
 	printf("Downloading script...\n");
 	NathanLinkedList* urlList = GetUrls(batchFileURL);
-	// Make sure we got exactly 4 URLs
-	if (getLinkedListLength(urlList)!=4){
-		printf("Incorrect number of URLs found. %d URLs were found, when exactly 4 were expected.\nURLs found:\n",getLinkedListLength(urlList));
+	// Make sure we got exactly the number of URLs we want.
+	if (getLinkedListLength(urlList)!=_totalFilesToDownload){
+		printf("Incorrect number of URLs found. %d URLs were found, when exactly %d were expected.\nURLs found:\n",getLinkedListLength(urlList),_totalFilesToDownload);
 		int i;
 		for (i=0;i<getLinkedListLength(urlList);i++){
 			printf("%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
@@ -446,7 +452,7 @@ int main(int argc, char *argv[]){
 	char* streamingAssetsPath=malloc(strlen(userDataFolderPathInput)+strlen("/StreamingAssets")+1);
 	strcpy(streamingAssetsPath,userDataFolderPathInput);
 	strcat(streamingAssetsPath,SLASH"StreamingAssets");
-	free(userDataFolderPathInput);
+	// We don't free userDataFolderPathInput yet because we need it later
 
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_PATCH){
 		char* _tempFolderCheck=malloc(strlen(streamingAssetsPath)+strlen("/CompiledUpdateScripts")+1);
@@ -459,11 +465,13 @@ int main(int argc, char *argv[]){
 		free(_tempFolderCheck);
 	}
 
+	// 4th url is special
+
 	// Actually download the files
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice == DOWNLOADLIST_HIGURASHIVITA){
 		int i;
-		for (i=1;i<=4;i++){
-			printf("Downloading file %d/4...\n",i);
+		for (i=1;i<=_totalFilesToDownload;i++){
+			printf("Downloading file %d/%d...\n",i,_totalFilesToDownload);
 			char _completedFilename[6]; // Null .zip one digit number
 			itoa(i,_completedFilename,10);
 			strcat(_completedFilename,".zip");
@@ -482,12 +490,24 @@ int main(int argc, char *argv[]){
 		extractZIP("./1.zip",streamingAssetsPath);
 		extractZIP("./2.zip",streamingAssetsPath);
 		extractZIP("./3.zip",streamingAssetsPath);
-		extractZIP("./4.zip",streamingAssetsPath);
+		if (userUpdateChoice==DOWNLOADLIST_ALL){ // Special destination for patch because of dll files
+			printf("Extract to %s\n",userDataFolderPathInput);
+			extractZIP("./4.zip",userDataFolderPathInput);
+		}else{
+			extractZIP("./4.zip",streamingAssetsPath);
+		}
+		if (userUpdateChoice==DOWNLOADLIST_ALL){ // Textbox
+			extractZIP("./5.zip",streamingAssetsPath);
+		}
 	}else{
 		char _completedFilename[6]; // Null .zip one digit number
 		itoa(userUpdateChoice,_completedFilename,10);
 		strcat(_completedFilename,".zip");
-		extractZIP(_completedFilename,streamingAssetsPath);
+		if (userUpdateChoice==DOWNLOADLIST_PATCH){
+			extractZIP(_completedFilename,userDataFolderPathInput);
+		}else{
+			extractZIP(_completedFilename,streamingAssetsPath);
+		}
 	}	
 	printDivider();
 	printf("Done.\nI have no idea if it worked.\n");
