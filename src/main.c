@@ -1,5 +1,5 @@
 
-#define VERSION 1
+#define VERSION 1.2
 #define ISDEBUG 0
 
 #define CERTFILELOCATION "./curl-ca-bundle.crt"
@@ -71,7 +71,7 @@
 #if PLATFORM == PLAT_WINDOWS
 	// getline replacement for Windows
 	size_t getline(char **lineptr, size_t *n, FILE *stream) {
-		/* This code (applies to this method only) is public domain -- Will Hartung 4/9/09 */
+		/* This code (applies to this function only) is public domain -- Will Hartung 4/9/09 */
 		char *bufptr = NULL;
 		char *p = bufptr;
 		size_t size;
@@ -332,7 +332,7 @@ void init(){
 }
 /*============================================================================*/
 int main(int argc, char *argv[]){
-	printf("========================\nHigurashi: When They Cry PS3 Voices & Graphics auto installer\nv%d\n",VERSION);
+	printf("========================\nHigurashi: When They Cry PS3 Voices & Graphics auto installer\nv%s\n",VERSION);
 	if (!checkRequiredFiles()){
 		return 1;
 	}
@@ -354,12 +354,12 @@ int main(int argc, char *argv[]){
 	do{
 		printDivider();
 		printf("What would you like to do?\n");
-		printf("1) Install the patch. (Do this if it's your first time.)\n");
+		printf("1) Install the entire patch\n");
 		printf("2) Update the PS3 graphics patch\n");
 		printf("3) Update the Voice patch\n");
 		printf("4) Update the MangaGamer graphics patch\n");
 		printf("5) Update the patch scripts and dll\n");
-		printf("6) Install the older Higurashi-Vita compatible version.\n");
+		printf("6) Install the older, Higurashi-Vita compatible version.\n");
 
 		userUpdateChoice = (short)Goodgetchar();
 		if (userUpdateChoice>=58 || userUpdateChoice<=48 || userUpdateChoice-48>6){
@@ -400,8 +400,7 @@ int main(int argc, char *argv[]){
 		}
 		return 1;
 	}
-
-	// Ask user for data directory
+	// Make platform specific example game directory before asking the user.
 	char* exampleFolderPath;
 	#if PLATFORM == PLAT_LINUX
 		char* userHomeDirectory = getHomeDirectory();
@@ -417,6 +416,7 @@ int main(int argc, char *argv[]){
 	char exampleDirectoryIsInvalid = !(checkDirectoryExists(exampleFolderPath));
 	char* userDataFolderPathInput;
 	char isSecondTimeLooped=0;
+	// Ask user for data directory
 	do{
 		if (isSecondTimeLooped==1){
 			printf("!!!!!!!!!!!!\n%s does not exist!\n!!!!!!!!!!!!\n",userDataFolderPathInput);
@@ -454,6 +454,7 @@ int main(int argc, char *argv[]){
 	strcat(streamingAssetsPath,SLASH"StreamingAssets");
 	// We don't free userDataFolderPathInput yet because we need it later
 
+	// Delete precompiled update scripts because new scripts won't be compiled if these exist, usually.
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_PATCH){
 		char* _tempFolderCheck=malloc(strlen(streamingAssetsPath)+strlen("/CompiledUpdateScripts")+1);
 		strcpy(_tempFolderCheck,streamingAssetsPath);
@@ -464,8 +465,6 @@ int main(int argc, char *argv[]){
 		}
 		free(_tempFolderCheck);
 	}
-
-	// 4th url is special
 
 	// Actually download the files
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice == DOWNLOADLIST_HIGURASHIVITA){
@@ -486,14 +485,14 @@ int main(int argc, char *argv[]){
 	}
 	freeLinkedList(urlList);
 
+	// Extract stuff that was just downloaded
 	if (userUpdateChoice==DOWNLOADLIST_ALL || userUpdateChoice==DOWNLOADLIST_HIGURASHIVITA){
 		extractZIP("./1.zip",streamingAssetsPath);
 		extractZIP("./2.zip",streamingAssetsPath);
 		extractZIP("./3.zip",streamingAssetsPath);
 		if (userUpdateChoice==DOWNLOADLIST_ALL){ // Special destination for patch because of dll files
-			printf("Extract to %s\n",userDataFolderPathInput);
 			extractZIP("./4.zip",userDataFolderPathInput);
-		}else{
+		}else{ // Is HIGURASHIVITA, use normal location
 			extractZIP("./4.zip",streamingAssetsPath);
 		}
 		if (userUpdateChoice==DOWNLOADLIST_ALL){ // Textbox
@@ -508,7 +507,8 @@ int main(int argc, char *argv[]){
 		}else{
 			extractZIP(_completedFilename,streamingAssetsPath);
 		}
-	}	
+	}
+	// User won't even see this as the program ends instantly.
 	printDivider();
 	printf("Done.\nI have no idea if it worked.\n");
 	printDivider();

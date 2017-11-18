@@ -1,1 +1,0 @@
-https://raw.githubusercontent.com/07th-mod/resources/master/%s/install.bat
