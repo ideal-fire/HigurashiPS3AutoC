@@ -1,5 +1,5 @@
 
-#define VERSION 1.2
+#define VERSION "v0.4"
 #define ISDEBUG 0
 
 #define CERTFILELOCATION "./curl-ca-bundle.crt"
@@ -248,8 +248,50 @@ NathanLinkedList* GetUrls(char* batchFileURL){
 			NathanLinkedList* _tempAddList = addToLinkedList(_tempUrlList);
 			_tempAddList->memory = malloc(i+1);
 			strncpy(_tempAddList->memory,_urlSearchResult,i);
-			(_tempAddList->memory)[i]='\0';
-			removeNewline(&(_tempAddList->memory));
+			((char*)(_tempAddList->memory))[i]='\0';
+			removeNewline(((char**)&_tempAddList->memory));
+			if (strstr(_tempAddList->memory,"updater.bat")!=NULL){
+				printf("Found updater.\n");
+				removeFromLinkedList(&_tempUrlList,getLinkedListLength(_tempUrlList));
+				break;
+			}else if (strstr(_tempAddList->memory,"assets.browser_download_url")!=NULL){
+				//void downloadWebpageData(const char* url, char** _toStoreWebpageData, size_t* _toStoreSize)
+				char* _downloadedJSONLatestRelease;
+				size_t _downloadedJSONLatestReleaseLength;
+
+				// Recieved URL:
+				// https://api.github.com/repos/07th-mod/tatarigoroshi/releases/latest).content).assets.browser_download_url
+				// It has stuff at the end for JSON parsing
+				// We fix this url by removing everything after the first right parenthese
+				int i;
+				for (i=0;i<strlen(_tempAddList->memory);i++){
+					if (((char*)_tempAddList->memory)[i]==')'){
+						((char*)(_tempAddList->memory))[i]=0;
+						break;
+					}
+				}
+				downloadWebpageData(_tempAddList->memory,&_downloadedJSONLatestRelease,&_downloadedJSONLatestReleaseLength);
+				char* _foundBrowserDownloadUrlLocation = strstr(_downloadedJSONLatestRelease,"browser_download_url");
+				if (_foundBrowserDownloadUrlLocation!=NULL){
+					char _foundReleaseUrl[256];
+					_foundBrowserDownloadUrlLocation = _foundBrowserDownloadUrlLocation+strlen("browser_download_url\": \"");
+					
+					for (i=0;i<256;i++){
+						if (_foundBrowserDownloadUrlLocation[i]=='\"'){
+							_foundReleaseUrl[i]=0;
+							break;
+						}
+						_foundReleaseUrl[i] = _foundBrowserDownloadUrlLocation[i];
+					}
+					free(_tempAddList->memory);
+					_tempAddList->memory = malloc(strlen(_foundReleaseUrl)+1);
+					strcpy(_tempAddList->memory,_foundReleaseUrl);
+				}else{
+					printf("Bad JSON:");
+					printf("%s\n",_foundBrowserDownloadUrlLocation);
+					exit(1);
+				}
+			}
 		}
 		lastFoundLine = strtok (NULL, "\n");
 	}
@@ -332,7 +374,9 @@ void init(){
 }
 /*============================================================================*/
 int main(int argc, char *argv[]){
+	printf("a");
 	printf("========================\nHigurashi: When They Cry PS3 Voices & Graphics auto installer\nv%s\n",VERSION);
+	printf("b\n");
 	if (!checkRequiredFiles()){
 		return 1;
 	}
@@ -359,7 +403,7 @@ int main(int argc, char *argv[]){
 		printf("3) Update the Voice patch\n");
 		printf("4) Update the MangaGamer graphics patch\n");
 		printf("5) Update the patch scripts and dll\n");
-		printf("6) Install the older, Higurashi-Vita compatible version.\n");
+		printf("6) Install the older, Higurashi-Vita/3ds compatible version.\n");
 
 		userUpdateChoice = (short)Goodgetchar();
 		if (userUpdateChoice>=58 || userUpdateChoice<=48 || userUpdateChoice-48>6){
@@ -471,6 +515,11 @@ int main(int argc, char *argv[]){
 		int i;
 		for (i=1;i<=_totalFilesToDownload;i++){
 			printf("Downloading file %d/%d...\n",i,_totalFilesToDownload);
+
+			if (strcmp(getLinkedList(urlList,i)->memory,"https://api.github.com/repos/07th-mod/tatarigoroshi/releases/latest).content).assets.browser_download_url")==0){
+				printf("detected repo special");
+			}
+
 			char _completedFilename[6]; // Null .zip one digit number
 			itoa(i,_completedFilename,10);
 			strcat(_completedFilename,".zip");
