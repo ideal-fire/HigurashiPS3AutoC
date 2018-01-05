@@ -195,7 +195,7 @@ char selectGame(NathanLinkedList* _tempGamenameList){
 		printDivider();
 		int i;
 		for (i=0;i<getLinkedListLength(_tempGamenameList);i++){
-			printf("%d) %s\n",(i+1),getLinkedList(_tempGamenameList,i+1)->memory);
+			printf("%d) %s\n",(i+1),(char*)getLinkedList(_tempGamenameList,i+1)->memory);
 		}
 		_userChosenGame = Goodgetchar();
 		if (_userChosenGame>=58 || _userChosenGame<=48 || _userChosenGame-48>getLinkedListLength(_tempGamenameList)){
@@ -440,7 +440,7 @@ int main(int argc, char *argv[]){
 		printf("Incorrect number of URLs found. %d URLs were found, when exactly %d were expected.\nURLs found:\n",getLinkedListLength(urlList),_totalFilesToDownload);
 		int i;
 		for (i=0;i<getLinkedListLength(urlList);i++){
-			printf("%d) %s\n",(i+1),getLinkedList(urlList,i+1)->memory);
+			printf("%d) %s\n",(i+1),(char*)getLinkedList(urlList,i+1)->memory);
 		}
 		return 1;
 	}
